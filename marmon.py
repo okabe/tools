@@ -23,6 +23,7 @@ def get_quote( ticker ):
     avg_volume     = ""
     market_cap     = ""
     pe_ratio       = ""
+    status         = ""
     
     url = "https://ca.finance.yahoo.com/q?s={}".format( ticker )
     
@@ -39,17 +40,19 @@ def get_quote( ticker ):
         for span in div.findAll( "span", { "class" : "time_rtq_ticker" } ):
             days_last = span.text
         #change
-        for span in div.findAll( "span", { "class" : "up_g time_rtq_content" } ):
-            status = ""
-            for i in span.findAll( "span" ):
-                for j in i.findAll( "img", { "class" : "pos_arrow" } ):
-                    if "Up" or "Down" in str( j ):
-                        if "Up" in str( j ):
-                            status = "+"
-                        else:
-                            status = "-"
-                        change = "{}{}".format( status, i.text )
-                change_percent = "{}{}".format( status, i.text[1:-1] )
+        count = 0
+        for span in div.findAll( "span" ):
+            count +=1
+            for i in span.findAll( "img" ):
+                if "Up" in str( i ):
+                    status = "+"
+                elif "Down" in str( i ):
+                    status = "-"
+            if count is 4:
+                change = "{}{}".format( status, span.text )
+            if count is 5:
+                change_percent = "{}{}".format( status, span.text[1:-1] )
+                break
 
     for div in quote.findAll( "div", { "class" : "yui-u first yfi-start-content" } ):
         for tr in div.findAll( "tr" ):
