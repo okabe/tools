@@ -1,0 +1,74 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          msfd
+# Required-Start:    $network $local_fs
+# Required-Stop:     $network $local_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts and stops Metaploit
+# Description:       Starts and stops Metasploit
+### END INIT INFO
+#
+# description: Starts and stops the Metasploit Daemon
+#
+
+MSFD_SERVICE="/usr/share/metasploit-framework/msfd"
+MSFD_NAME="MSFD"
+MSFD_PID_FILE="/var/run/msfd.pid"
+
+test -x $MSF_SERVICE || {
+    echo "$MSF_NAME not availible"
+    exit 1
+}
+
+RETVAL=0
+
+start() {
+    KIND="$MSFD_NAME"
+    echo "[+] Starting $MSFD_NAME"
+    $MSFD_SERVICE
+    return 0
+}
+
+stop() {
+    if [ $( ps aux | grep $MSFD_SERVICE | wc -l ) -eq 2 ] ; then
+        pid=$( ps aux | grep $MSFD_SERVICE | grep ruby | awk '{print $2}' )
+        kill $pid && echo "[+] Stopped $MSFD_NAME"
+    fi
+    return 0
+}
+
+restart() {
+    stop
+    sleep 3
+    start
+}
+
+status() {
+    if [ $( ps aux | grep $MSFD_SERVICE | wc -l ) -eq 2 ] ; then
+        echo "[+] $MSFD_NAME is running"
+    else
+        echo "[-] $MSFD_NAME is stopped"
+    fi
+    return 3
+}
+
+case "$1" in
+    start)
+        start 
+        ;;
+    stop)
+        stop 
+        ;;
+    restart)
+        restart
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|restart|status}"
+        exit 1
+esac
+
+exit $?
