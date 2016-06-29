@@ -1,12 +1,17 @@
 #!/usr/bin/env python2
 
 from BeautifulSoup import BeautifulSoup as Soup
-from multiprocessing import Process, Queue
 from time import sleep
-import urllib2
-import re
+import urllib2, re, sys
 
 url = "http://pastebin.com"
+
+try:
+    logfile = sys.argv[1]
+    print "[+] Saving to {}".format( sys.argv[1] )
+except Exception as NOLOGFILE:
+    print "[!] Results will not be saved!!!"
+    logfile = None
 
 regexes = {
     "email"       : re.compile(( 
@@ -40,12 +45,17 @@ def matcher( url, line ):
     for regex in regexes:
         if re.search( regexes[regex], line ):
             finding = re.findall( regexes[regex], line )
-            print "[+] Found {} on {}: {}".format( 
+            msg = "[+] Found {} on {}: {}".format( 
                 regex,
                 url,
                 finding
             )
-
+            print msg
+            if logfile is not None:
+                with open( logfile, "a" ) as f:
+                    f.write( "{}\n".format( msg ) )
+                f.close()
+            
 checked = []
 
 while True:
@@ -61,15 +71,5 @@ while True:
                     print "[-] Checking {}".format( rawpaste )
                     for line in urllib2.urlopen( rawpaste ):
                         matcher( rawpaste, line )
-    
-    """ pastie.org """
-    #soup = Soup( urllib2.urlopen( "http://pastie.org/pastes" ).read() )
-    #for p in soup.findAll( "p", { "class" : "link" } ):
-    #    for pastie in p.findAll( "a" ):
-    #        rawpastie = "{}/text".format( pastie['href'] )
-    #        if rawpastie not in checked:
-    #            checked.append( rawpastie )
-    #            for line in urllib2.urlopen( rawpastie ):
-    #                matcher( rawpastie, line )
     
     sleep( 5 )
