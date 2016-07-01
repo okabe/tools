@@ -56,26 +56,36 @@ def matcher( url, line ):
                     f.write( "{}\n".format( msg ) )
                 f.close()
             
-checked = []
+def fetch( url, tracker ):
+    soup = Soup( urllib2.urlopen( url ).read() )
 
-while True:
-    print "[+] Checking for new pastes"
-    """ check pastebin.com """
-    try:
-        soup = Soup( urllib2.urlopen( url ).read() )
-    except Exception as BADGATEWAY:
-        print "[!] Failed to fetch our soup!! Sleeping for 60 seconds."
-        sleep( 60 )
-        soup = Soup( urllib2.urlopen( url ).read() )
-        
     for menu in soup.findAll( "ul", { "class" : "right_menu" } ):
         for li in menu.findAll( "li" ):
             for a in li.findAll( "a" ):
                 rawpaste = ( "http://pastebin.com/raw{}".format( a['href'] ) )
-                if rawpaste not in checked:
-                    checked.append( rawpaste )
+                checked = False
+                for i in tracker:
+                    if rawpaste in i:
+                        checked = True
+                if checked is False:
+                    tracker.append( rawpaste )
                     print "[-] Checking {}".format( rawpaste )
                     for line in urllib2.urlopen( rawpaste ):
                         matcher( rawpaste, line )
+
+tracker = []
     
-    sleep( 5 )
+while True:
+    print "[>] Checking for new pastes"
+    """ check pastebin.com """
+    try:
+        fetch( url, tracker )
+    except Exception as ERROR:
+        print "[!] Fetch failed: {}".format( ERROR )
+        sleepytime = 60
+        for i in range( 0, ( sleepytime + 1 ) ):
+            sleep( 1 )
+            sys.stdout.write( "[-] Sleeping for {} seconds".format( str( sleepytime - i ) ) )
+            sys.stdout.flush()
+            sys.stdout.write( "\b" * 100 )
+    sleep( 2 )
