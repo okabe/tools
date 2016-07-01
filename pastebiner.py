@@ -61,7 +61,13 @@ checked = []
 while True:
     print "[+] Checking for new pastes"
     """ check pastebin.com """
-    soup = Soup( urllib2.urlopen( "http://pastebin.com" ).read() )
+    try:
+        soup = Soup( urllib2.urlopen( url ).read() )
+    except Exception as BADGATEWAY:
+        print "[!] Failed to fetch our soup!! Sleeping for 60 seconds."
+        sleep( 60 )
+        soup = Soup( urllib2.urlopen( url ).read() )
+        
     for menu in soup.findAll( "ul", { "class" : "right_menu" } ):
         for li in menu.findAll( "li" ):
             for a in li.findAll( "a" ):
