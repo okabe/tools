@@ -88,4 +88,4 @@ while True:
             sys.stdout.write( "[-] Sleeping for {} seconds".format( str( sleepytime - i ) ) )
             sys.stdout.flush()
             sys.stdout.write( "\b" * 100 )
-    sleep( 2 )
+    sleep( 3 )
