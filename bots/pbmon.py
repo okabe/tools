@@ -2,15 +2,10 @@
 
 from BeautifulSoup import BeautifulSoup as Soup
 from multiprocessing import Process, Queue
+from random import randint
 from time import sleep
 
 import urllib2, re, sys, socket, ssl, signal, argparse
-
-""" 
-    this is just a tiny little bot that spams about shit it finds on pastebin (maybe someday 
-    even other paste bin sites?)
-"""
-
 
 regexes = {
     "email"       : re.compile(( 
@@ -40,22 +35,26 @@ regexes = {
                     ))
 }
 
-def matcher():
-    while True:
-        if matchq.empty() is not True:
-            tup = matchq.get()
-            url = tup[0]
-            line = tup[1]
-            for regex in regexes:
-                if re.search( regexes[regex], line ):
-                    finding = re.findall( regexes[regex], line )
-                    msg = "[+] Found {} on {}: {}".format( regex, url, finding )
-                    sendq.put( msg )
-        else:
-            sleep( 1 )
-            continue
+def matcher( target_url ):
+    findings = {
+        "email"     : 0,
+        "emailpass" : 0,
+        "link"      : 0,
+        "ipv4"      : 0,
+        "ipv4port"  : 0
+    }
+            
+    for line in urllib2.urlopen( target_url ):
+        for regex in regexes:
+            if re.search( regexes[regex], line ):
+                findings[regex] += 1
+                        
+    for i in findings:
+        if findings[i] > 0:
+            msg = "\033[32m[+] Found {} {} in {}\033[0m".format( findings[i], i, target_url )
+            sendq.put( msg )
 
-def fetch( url, tracker ):
+def pastebinfetch( url, tracker ):
     soup = Soup( urllib2.urlopen( url ).read() )
     for menu in soup.findAll( "ul", { "class" : "right_menu" } ):
         for li in menu.findAll( "li" ):
@@ -67,20 +66,38 @@ def fetch( url, tracker ):
                         checked = True
                 if checked is False:
                     tracker.append( rawpaste )
-                    sendq.put( "[-] Checking {}".format( rawpaste ) )
-                    for line in urllib2.urlopen( rawpaste ):
-                        matchq.put( ( rawpaste, line ) )
+                    sendq.put( "\033[34m[-] Checking {}\033[0m".format( rawpaste ) )
+                    matcher( rawpaste )
+
+def sprungebrute():
+    while True:
+        nid = ""
+        symbols = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        while len( nid ) < 4:
+            n = randint( 0, 35 )
+            nid = nid + symbols[n:n + 1]
+        try:
+            sprunge_url = "http://sprunge.us/{}".format( nid )
+            print "[-] Trying {}".format( url )
+            sendq.put( "\033[34m[-] Trying {}\033[0m".format( sprunge_url ) )
+            matcher( sprunge_url )
+        except Exception as ERROR:
+            sendq.put( "\033[91m[!] Fetch failed: {}\033[0m".format( ERROR ) )
+            sendq.put( "\033[93m[-] Pausing SprungeBrute for 60 seconds\033[0m" )
+            sleep( 57 )
+        sleep( 3 )
 
 def fetcher( url, tracker ):
     while True:
-        sendq.put( "[>] Checking for new pastes" )
+        sendq.put( "\033[97m[>] Searching...\033[0m" )
         try:
-           fetch( url, tracker )
+           pastebinfetch( url, tracker )
         except Exception as ERROR:
-           sendq.put( "[!] Fetch failed: {}".format( ERROR ) )
-           sendq.put( "[-] Sleeping for 60 seconds" )
-           sleepytime = 60
+           sendq.put( "\033[91m[!] Fetch failed: {}\033[0m".format( ERROR ) )
+           sendq.put( "\033[93m[-] Pausing PasteFetch for 60 seconds\033[0m" )
+           sleep( 57 )
         sleep( 3 )
+
 
 if __name__ == "__main__":
     
@@ -93,6 +110,7 @@ if __name__ == "__main__":
     sendq      = Queue()
     matchq     = Queue()
     tracker    = []
+    findings   = []
     procs      = []
 
     sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
@@ -105,15 +123,25 @@ if __name__ == "__main__":
     irc.send( "USER {} {} {} :ohaio\n".format( nick, nick, nick ) )
     irc.send( "NICK {}\n".format( nick ) )
     
-    for i in range( 1, 2 ):
-        proc = Process( target=matcher )
-        proc.start()
-        procs.append( proc )
-
+    """ start pastebin monitor """
     proc = Process( target=fetcher, args=( url, tracker, ) )
     proc.start()
     procs.append( proc )
+    
+    """ start sprunge bruter """
+    proc = Process( target=sprungebrute )
+    proc.start()
+    procs.append( proc )
 
+    def signal_handler( signal, frame ):
+        print "[!] Shutting down"
+        for proc in procs:
+            proc.terminate()
+        sys.exit( 0 )
+
+    signal.signal( signal.SIGINT, signal_handler )
+    print "[+] Press Ctrl+C to quit"
+    
     inchan = False
     data = ""
     while True:
@@ -135,6 +163,6 @@ if __name__ == "__main__":
             line = sendq.get()
             msg = "PRIVMSG {} :{}\n".format( chan, line )
             irc.send( msg )
-            print "[>>>] {}".format( msg )
+            print "[>>>] {}".format( msg.rstrip( "\n" ) )
         
         continue
