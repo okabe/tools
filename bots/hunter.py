@@ -2,10 +2,12 @@
 
 from BeautifulSoup import BeautifulSoup as Soup
 from multiprocessing import Process, Queue
+from threading import Thread
 from random import randint, choice
 from time import sleep
 
 import urllib2, re, sys, socket, ssl, signal, argparse
+
 
 class Core:
 
@@ -20,15 +22,22 @@ class Core:
         }
 
         self.state = {
-            "sendq"   : Queue(),
-            "procs"   : [],
-            "proxies" : [],
-            "socket"  : socket.socket( socket.AF_INET, socket.SOCK_STREAM ),
-            "inchan"  : False
+            "sendq"      : Queue(),
+            "proxyq"     : Queue(),
+            "emailpassq" : Queue(),
+            "procs"      : [],
+            "proxies"    : [],
+            "emailpass"  : [],
+            "link"       : [],
+            "ipv4"       : [],
+            "ipv4port"   : [],
+            "socket"     : socket.socket( socket.AF_INET, socket.SOCK_STREAM ),
+            "inchan"     : False
         }
 
         self.miners = {
             "pastebiner"    : self.pastebiner,
+            "ghostbiner"    : self.ghostbiner,
             "sprungebruter" : self.sprungebruter
             #"eightchanscan" : self.eightchanscan
         }
@@ -102,8 +111,12 @@ class Core:
         formated = "\x032[*] {}\x03".format( msg )
         self.state["sendq"].put( formated )
 
+    def _coming_soon_( self, msg ):
+        formated = "\x0311[*] {}\x03".format( msg )
+        self.state["sendq"].put( formated )
+
     def _verb_( self, msg ):
-        formated = "\x0315[>] {}\x03".format( msg )
+        formated = "\x030[>] {}\x03".format( msg )
         self.state["sendq"].put( formated )
 
     def _warn_( self, msg ):
@@ -123,25 +136,31 @@ class Core:
 
     def _match_( self, target_url ):
         """ Check for goodies """
-        try:
-            for line in self._GET_( target_url ).readlines():
-                for regex in self.regexes:
-                    if re.search( self.regexes[regex], line ):
-                        self.tracker[regex] += 1
-                        self.stats[regex] += 1
+        tmp = []
+        for line in self._GET_( target_url ).readlines():
+            for regex in self.regexes:
+                if re.search( self.regexes[regex], line ):
+                    self.tracker[regex] += 1
+                    self.stats[regex] += 1
+                    tmp.append( line.rstrip( "\n" ) )
 
-            for i in self.tracker:
-                if self.tracker[i] > 0:
-                    msg = "Found {} {} in {}".format( self.tracker[i], i, target_url )
-                    self._good_( msg )
+        for i in self.tracker:
+            if self.tracker[i] > 0:
+                msg = "Found {} {} in {}".format( self.tracker[i], i, target_url )
+                self._good_( msg )
+                if "ipv4port" in i:
+                    self._action_( "Checking {} for proxies".format( target_url ) )
+                    for proxy in tmp:
+                       self.state["proxyq"].put( proxy )
+                elif "emailpass" in i:
+                    #self._action_( "Checking {} for valid credentials".format( target_url ) )
+                    self._coming_soon_( "Credential scanner coming soon!!!" )
+                    for emailpass in tmp:
+                        self.state["emailpassq"].put( emailpass )
             
-            for i in self.tracker:
-                self.tracker[i] = 0
+        for i in self.tracker:
+            self.tracker[i] = 0
         
-        except Exception as ERROR:
-            msg = "Match request error: {}".format( ERROR )
-            self._error_( msg )
-
     def _checkpb_( self ):
         try:
             soup = Soup( self._GET_( "http://pastebin.com" ).read() )
@@ -155,13 +174,28 @@ class Core:
                                 checked = True
                         if checked is False:
                             self.visited["pastebin"].append( rawpaste )
-                            self._action_( "Checking {}".format( rawpaste ) )
                             self._match_( rawpaste )
         except Exception as ERROR:
             msg = "PBMon threw an error: {}".format( ERROR )
             self._error_( msg )
             self._warn_( "Pausing PBMon for 300 seconds" )
             sleep( 297 )
+
+    def _checkgb_( self ):
+        nid = ""
+        symbols = "abcdefghijklmnopqrstuvwxyz0123456789"
+        while len( nid ) < 5:
+            nid = nid + choice( [ x for x in symbols ] )
+        try:
+            ghost_url = "https://ghostbin.com/paste/{}".format( nid )
+            self._match_( ghost_url )
+        except Exception as ERROR:
+            msg = "GBMon threw and error : {}".format( ERROR )
+            if "420" in msg:
+                self._error_( msg )
+                self._warn_( "Request was blocked!! Pausing GBMon for 24 hours" )
+                sleep( ( 60 * 60 * 24 ) )
+            pass
 
     def _sprungebrute_( self ):
         nid = ""
@@ -171,13 +205,13 @@ class Core:
             nid = nid + symbols[n:n + 1]
         try:
             sprunge_url = "http://sprunge.us/{}".format( nid )
-            self._action_( "Trying {}".format( sprunge_url ) )
+            #self._action_( "Trying {}".format( sprunge_url ) )
             self._match_( sprunge_url )
         except Exception as ERROR:
             msg = "SprungeBrute threw an error: {}".format( ERROR )
             self._error_( msg )
-            self._warn_( "Pausing SprungeBruter for 60 seconds" )
-            sleep( 58 )
+            self._warn_( "Service is down!! Pausing SprungeBrute for 24 hours" )
+            sleep( ( 60 * 60 * 24 ) )
 
     def _scan8chan_( self ):
         try: #currently im only interested in this board
@@ -186,7 +220,7 @@ class Core:
                 for href in thread.findAll( "a" ):
                     if "baphomet/res" in href['href'] and href['href'].endswith( "html" ):
                         thread_url = "http://8ch.net{}".format( href['href'] )
-                        self._action_( "Lurking {}".format( thread_url ) )
+                        #self._action_( "Lurking {}".format( thread_url ) )
                         self._match_( thread_url )
         except Exception as ERROR:
             msg = "8ChanScan threw an error: {}".format( ERROR )
@@ -194,10 +228,36 @@ class Core:
             self._warn_( "Pausing 8ChanScan for 120 seconds" )
             sleep( 60 )
 
+    def proxy_checker( self ):
+        while True:
+            if self.state["proxyq"] is not True:
+                proxy = self.state["proxyq"].get().rstrip( "\n\r" )
+                try:
+                    opener = urllib2.build_opener( urllib2.ProxyHandler( { "http" : proxy } ) )
+                    urllib2.install_opener( opener )
+                    for i in urllib2.urlopen( "http://icanhazip.com/", timeout=2 ).readlines():
+                        print "[+] Working proxy: {}".format( proxy )
+                        self.state["proxies"].append( proxy )
+                except Exception as E:
+                    pass
+            sleep( 1 )
+            continue
+
+    def asset_count( self, asset ):
+        if len( self.state[asset] ) > 0:
+            self.state[asset] = list( set( self.state[asset] ) )
+            assetcount = str( len( self.state[asset] ) )
+            self._verb_( " > {} {}".format( assetcount, asset ) )
+        
     def pastebiner( self ):
         while True:
             self._checkpb_()
             sleep( 3 )
+
+    def ghostbiner( self ):
+        while True:
+            self._checkgb_()
+            sleep( 60 )
 
     def sprungebruter( self ):
         while True:
@@ -208,7 +268,7 @@ class Core:
         while True:
             self._scan8chan_()
             sleep( 60 )
-
+    
     def start_bot( self ):
         """ connect bot and start miners """
         self.state["socket"].settimeout( 2 )
@@ -226,20 +286,32 @@ class Core:
             proc = Process( target=self.miners[i] )
             proc.start()
             self.state["procs"].append( proc )
-            
-        data = ""
+    
+        for i in xrange( 18 ):
+            proc = Thread( target=self.proxy_checker )
+            proc.start()
+
+        data   = ""
+        ticker = 0
         while True:
+            if ( ticker % 50 == 0 ) and self.state["inchan"] is True:
+                self._verb_( ">> Data Hunter version 0.0.1 <<" )
+                self._verb_( "=> Harvested" )
+                
+                if len( self.state["proxies"] ) > 0:
+                    self.asset_count( "proxies" )
+
+                if len( self.state["emailpass"] ) > 0:
+                    self.asset_count( "emailpass" )
+
             try:
                 data = self.state["socket"].recv( 2048 )
+                print data
             except:
                 pass
         
             if data.find( "PING :" ) != -1:
                 self.state["socket"].send( "PONG :{}\n".format( data.split( ":" )[1] ) )
-                if self.state["inchan"] is True:
-                    self._verb_( "Runtime Statistics" )
-                    for i in self.stats:
-                        self._verb_( "{} => {}".format( i, self.stats[i] ) )
                 continue
 
             elif "376" in data and self.state["inchan"] is False:
@@ -250,8 +322,9 @@ class Core:
                 line = self.state["sendq"].get()
                 msg = "PRIVMSG {} :{}\n".format( self.config["chan"], line )
                 self.state["socket"].send( msg )
-                print "[>>>] {}".format( msg.rstrip( "\n" ) )
-        
+                print ">>> {}".format( msg.rstrip( "\n" ) )
+                ticker += 1
+
             continue
 
 
@@ -265,8 +338,6 @@ if __name__ == "__main__":
 
     def signal_handler( signal, frame ):
         print "[!] Shutting down"
-        for proc in procs:
-            proc.terminate()
         sys.exit( 0 )
 
     parser = argparse.ArgumentParser( "Hunt for goodies" )
