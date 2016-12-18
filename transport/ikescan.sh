@@ -1,5 +1,4 @@
 #!/bin/bash
-#author: mp
 #comment: Encryption algorithms: DES, Triple-DES, AES/128, AES/192 and AES/256
 #Hash algorithms: MD5 and SHA1
 #Authentication methods: Pre-Shared Key, RSA Signatures, Hybrid Mode and XAUTH
