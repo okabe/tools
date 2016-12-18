@@ -1,6 +1,4 @@
 #!/bin/bash
-#author: punk
-#comment: simple bash keylogger
 
 usage () {
     echo "./keylog PID"
