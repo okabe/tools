@@ -1,9 +1,3 @@
-// casper|phantom JS
-// author: mp - heavily based on ry's POC
-// this requires casperjs and phantomjs to work sometimes OWA login portals are protected by 
-// microsuck forefront to provide cookie auth.. something that is annoying to code for with
-// any other language, so impersonate a browser and use that to make guessing attempts :)
-
 // this is currently broken
 
 var casper = require("casper").create({
