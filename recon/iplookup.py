@@ -1,6 +1,4 @@
 #!/usr/bin/env python2
-#author: mp
-#comment: scrape ipv4 information from whatismyipaddress.com
 from BeautifulSoup import BeautifulSoup as Soup
 import urllib2
 import re
