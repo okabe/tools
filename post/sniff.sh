@@ -1,6 +1,4 @@
 #!/bin/bash
-#author: mp
-#comment: poor mans sniffer
 
 proto=""
 host=""
