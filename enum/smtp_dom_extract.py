@@ -1,5 +1,4 @@
 #/usr/bin/env python2
-#author: mp
 
 import socket
 import base64
