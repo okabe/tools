@@ -1,7 +1,4 @@
 #!/usr/bin/env python2
-#author:mp
-#comment: scrape findings from http://www.routerpasswords.com/
-# for sys.argv[1]
 
 import sys
 import urllib2
