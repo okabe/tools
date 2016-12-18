@@ -1,7 +1,4 @@
 #!/bin/bash
-#variation of rw-'s owa script, rather then grepping for responses, simply log the HTTP response code
-#and draw results from that. Also the looping is set up a little nicer and there is a nice menu to go
-#with it
 
 usernames=''
 passwords=''
