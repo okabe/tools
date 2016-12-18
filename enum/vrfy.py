@@ -1,6 +1,4 @@
 #!/usr/bin/env python2
-#author: mp
-#comment: verify a list of emails using SMTP VRFY
 
 import socket
 import sys
