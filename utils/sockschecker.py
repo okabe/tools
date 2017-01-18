@@ -1,6 +1,5 @@
 #!/usr/bin/env python2
-#author: mp
-#comment: multiprocessed socks proxy checker
+
 
 from multiprocessing import Queue, Process
 import argparse
@@ -12,9 +11,6 @@ import httplib
 import signal
 
 class SocksiPyConnection( httplib.HTTPConnection ):
-    """ this is ripped from https://gist.github.com/e000/869791 typically with socks the method is to patch 
-    socket before importing urllib2, however this approach would force me to unload urllib2, repatch and 
-    import urllib2 all over again, this object solves this problem, thanks e000 """
     def __init__( self, proxytype, proxyaddr, proxyport=None, rdns=True, username=None, password=None, *args. **kwargs ):
         self.proxyargs  = ( proxytype, proxyaddr, proxyport, rdns, username, password )
         httplib.HTTPConnection.__init__( self, *args, **kwargs )
@@ -27,7 +23,6 @@ class SocksiPyConnection( httplib.HTTPConnection ):
         self.sock.connect(( self.host, self.port ))
         
 class SocksiPyHandler( urllib2.HTTPHandler ):
-    """ also ripped from https://gist.github.com/e000/869791 """
     def __init__( self, *args, **kwargs ):
         self.args = args
         self.kw   = kwargs
@@ -40,7 +35,6 @@ class SocksiPyHandler( urllib2.HTTPHandler ):
         return self.do_open( build, req )
 
 class Result:
-    """ object store for HTTP responses """
     def __init__( self, host, port, working ):
         self.state = {
             "host"    : host,
@@ -49,9 +43,7 @@ class Result:
         }
 
 class Scanner:
-    """ manage work queue for proxy tests """
     def __init__( self, proxylist, workers ):
-        """ initialize main object and configure state """
         self.state = {
             "proxies" : Queue(),
             "results" : Queue(),
@@ -61,12 +53,10 @@ class Scanner:
         }
 
         for worker in range( 0, int( self.state["workers"] ) + 1 ):
-            """ start worker processes """
             proc = Process( target=self.tester )
             self.state["procs"].append( proc )
             proc.start()
 
-        """ start a single printer process """
         proc = Process( target=self.printer )
         self.state["procs"].append( proc )
         proc.start()
@@ -75,7 +65,6 @@ class Scanner:
             self.state["proxies"].put( proxy.rstrip() )
 
     def tester( self ):
-        """ test a proxy to see if it works """
         while True: #keep checking for work
             if self.state["proxies"].empty() is not True:
                 proxy = self.state["proxies"].get()
@@ -94,7 +83,6 @@ class Scanner:
               continue
 
     def printer( self ):
-        """ print test result and status """
         while True: #check for results
             if self.state["results"].empty() is not True:
                 result = self.state["results"].get()
@@ -107,7 +95,6 @@ class Scanner:
                 continue
 
 if __name__ == "__main__":
-    """ parse switches and start """
     workers   = None
     proxylist = None
 
