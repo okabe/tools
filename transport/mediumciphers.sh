@@ -8,5 +8,5 @@
             -connect $1 \
             -cipher $c 2>/dev/null >/dev/null \
             && echo "[+] Supports: $line" \
-            || "[!] Unsupported: $line"
+            || echo "[!] Unsupported: $line"
     done
