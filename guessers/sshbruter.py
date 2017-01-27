@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+#didnt test this one, ill fix it later if i ever need to
 
 """
 00:06 <Guido> to attack multiple hosts at once
