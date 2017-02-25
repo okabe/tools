@@ -1,37 +1,53 @@
 #!/usr/bin/env python2
 
-from multiprocessing import Process, Queue
-from BeautifulSoup import BeautifulSoup as Soup
+from threading import Thread
+from Queue import Queue
 import urllib2
 import sys
 
-class Checker:
-    def __init__( self, proxy ):
-        opener = urllib2.build_opener( urllib2.ProxyHandler( { "http" : proxy } ) )
-        urllib2.install_opener( opener )
-        try:
-            for i in urllib2.urlopen( "http://icanhazip.com/" ).readlines():
-                print "[+] Working proxy: {}".format( i.rstrip( "\n" ) )
-        except Exception as E:
-            pass
+proxyq = Queue()
+printq = Queue()
 
-class Scanner:
-    def __init__( self, proxy_list, workers ):
-        self.state = {
-            "proxies" : Queue()
-        }
+def checker():
+    while True:
+        if proxyq.empty() is not True:
+            proxy = "http://{}".format( proxyq.get() )
+            url = "http://icanhazip.com"
+            proxy_handler = urllib2.ProxyHandler( { "http" : proxy } )
+            opener = urllib2.build_opener( proxy_handler )
+            urllib2.install_opener( opener )
+            printq.put( "[>] Trying {}".format( proxy ) )
+            try:
+                response = urllib2.urlopen( url, timeout=3 ).readlines()
+                for line in response:
+                    if line.rstrip( "\n" ) in proxy:
+                        printq.put( "[+] Working proxy: {}".format( proxy ) )
+                        with open( "working.txt", "a" ) as log:
+                            log.write( "{}\n".format( proxy ) )
+                        log.close()
+            except Exception as ERROR:
+                printq.put( "[!] Bad proxy: {}".format( proxy ) )
+            proxyq.task_done()
 
-        for i in xrange( int( workers ) ):
-            proc = Process( target=self.worker )
-            proc.start()
-
-        for proxy in open( proxy_list, "r" ).readlines():
-            self.state["proxies"].put( proxy.rstrip( "\n" ) )
-
-    def worker( self ):
-        while True:
-            if self.state["proxies"].empty() is not True:
-                Checker( self.state["proxies"].get() )
+def printer():
+    while True:
+        if printq.empty() is not True:
+            msg = printq.get()
+            print msg
+            printq.task_done()
 
 if __name__ == "__main__":
-    Scanner( sys.argv[1], 100 )
+    for i in xrange( 40 ):
+        proc = Thread( target=checker )
+        proc.daemon = True
+        proc.start()
+
+    for proxy in open( sys.argv[1], "r" ):
+        proxyq.put( proxy.rstrip( "\n" ) )
+
+    proc = Thread( target=printer )
+    proc.daemon = True
+    proc.start()
+
+    proxyq.join()
+    printq.join()
