@@ -75,7 +75,7 @@ class HashKiller:
                                 results += 1
                                 data = {
                                     "style" : "good",
-                                    "msg"   : "{}:{}".format( pwhash, line.rstrip( "\n" ) )
+                                    "msg"   : "{}".format( line.rstrip( "\n" ) )
                                 }
                                 self.state["sendq"].put( data )
                                 with open( self.state["crack_log"], "a" ) as cl:
