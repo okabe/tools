@@ -69,17 +69,18 @@ class HashKiller:
                     self.state["sendq"].put( data )
                     os.system( "hashcat {}".format( arg ) )
                     results = 0
-                    for line in open( tmpf, "r" ):
-                        if line:
-                            results += 1
-                            data = {
-                                "style" : "good",
-                                "msg"   : "{}:{}".format( pwhash, line.rstrip( "\n" ) )
-                            }
-                            self.state["sendq"].put( data )
-                            with open( self.state["crack_log"], "a" ) as cl:
-                                cl.write( data["msg"] )
-                            cl.close()
+                    if os.path.isfile( tmpf ):
+                        for line in open( tmpf, "r" ):
+                            if line:
+                                results += 1
+                                data = {
+                                    "style" : "good",
+                                    "msg"   : "{}:{}".format( pwhash, line.rstrip( "\n" ) )
+                                }
+                                self.state["sendq"].put( data )
+                                with open( self.state["crack_log"], "a" ) as cl:
+                                    cl.write( data["msg"] )
+                                cl.close()
                     if results > 0:
                         break
                 except Exception as ERROR:
