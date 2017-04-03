@@ -84,7 +84,7 @@ class HashKiller:
                         break
                 except Exception as ERROR:
                     data = {
-                        "style" : "warn",
+                        "style" : "alert",
                         "msg"   : "hashcat error for cycle {}/{}".format( str( count ), str( len( args ) ) )
                     }
                     self.state["sendq"].put( data )
