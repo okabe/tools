@@ -75,7 +75,9 @@ if __name__ == "__main__":
     parser.add_argument( "--proxy", "-p", required=False, help="socks host:port to use" )
     parser.add_argument( "--wordlist", "-w", required=False, help="wordlist of passwords" )
     parser.add_argument( "--passwd", "-P", required=False, help="password to guess with" )
-    
+    parser.add_argument( "--users", "-u", required=False, help="list of usernames to guess with" )
+    parser.add_argument( "--user", "-U", required=False, help="username to guess with" )
+
     args = vars( parser.parse_args() )
 
     targets = args["targets"] if args["targets"] else None
@@ -88,7 +90,14 @@ if __name__ == "__main__":
     elif args["passwd"]:
         passwds = [ args["passwd"] ]
     else:
-        passwds = None
+        passwds = []
+
+    if args["userlist"]:
+        users = [ x.rstrip( "\n" ) for x in open( args["wordlist"], "r" ).readlines() ]
+    elif args["user"]:
+        users = [ args["user"] ]
+    else:
+        users = []
 
     if proxy is not None:
         proxyhost = proxy.split( ":" )[0]
@@ -104,23 +113,29 @@ if __name__ == "__main__":
         paramiko.client.socket.socket = socks.socksocket
 
     if len( passwds ) == 0:
-        print "[!] Must have at least 1 password  to guess with"
+        print "[!] Must have at least 1 password to guess with"
         sys.exit( 1 )
 
-    for i in xrange( scanners ):
-        proc = Thread( target=scanner )
+    elif len( users ) == 0:
+        print "[!] Must have at least 1 username to guess with"
+        sys.exit( 1 )
+
+    else:
+        for i in xrange( scanners ):
+            proc = Thread( target=scanner )
+            proc.daemon = True
+            proc.start()
+
+        if targets is not None:
+            for target in open( targets, "r" ).readlines():
+                for user in users:
+                    targetq.put( "{}@{}".format( user, target.rstrip( "\n" ) ) )
+
+        signal.signal( signal.SIGINT, signal_handler )
+
+        proc = Thread( target=printer, args=( logfile, ) )
         proc.daemon = True
         proc.start()
 
-    if targets is not None:
-        for target in open( targets, "r" ).readlines():
-            targetq.put( target.rstrip( "\n" ) )
-
-    signal.signal( signal.SIGINT, signal_handler )
-
-    proc = Thread( target=printer, args=( logfile, ) )
-    proc.daemon = True
-    proc.start()
-
-    targetq.join()
-    printq.join()
+        targetq.join()
+        printq.join()
