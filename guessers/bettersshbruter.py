@@ -1,4 +1,3 @@
-% cat ~/tools/sshlogin.py        
 #!/usr/bin/env python2
 
 from threading import Thread
