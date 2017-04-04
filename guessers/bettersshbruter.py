@@ -1,3 +1,4 @@
+% cat ~/tools/sshlogin.py        
 #!/usr/bin/env python2
 
 from threading import Thread
@@ -14,27 +15,27 @@ import re
 printq = Queue()
 targetq = Queue()
 
-def check_server( host, user, pword ):
+def check_server( host, user, passwd ):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy( paramiko.AutoAddPolicy() )
     try:
-        ssh.connect( host, port=22, username=user, password=pword, timeout=10 )
-        printq.put( "[+] Login success: {}:{}@{}".format( user, pword, host ) )
+        ssh.connect( host, port=22, username=user, password=passwd, timeout=10 )
+        printq.put( "[+] Login success: {}:{}@{}".format( user, passwd, host ) )
         ( stdin, stdout, stderr ) = ssh.exec_command( "id" )
         result = " ".join( [ line.rstrip( "\n" ) for line in stdout.readlines() ] ).rstrip( "\n" )
         if "uid=0" in result:
             status = "root privs"
-            printq.put( "[+] Login success: {}:{}@{} - {}".format( user, pword, host, status ) )
+            printq.put( "[+] Login success: {}:{}@{} - {}".format( user, passwd, host, status ) )
         else:
-            printq.put( "[+] Login success: {}:{}@{}".format( user, pword, host ) )
+            printq.put( "[+] Login success: {}:{}@{}".format( user, passwd, host ) )
     except paramiko.AuthenticationException:
-        printq.put( "[!] Login failed: {}:{}@{}".format( user, pword, host ) )
+        printq.put( "[!] Login failed: {}:{}@{}".format( user, passwd, host ) )
     except socket.error:
-        printq.put( "[!] Socket Error... skipping: {}:{}@{}".format( user, pword, host ) )
+        printq.put( "[!] Socket Error... skipping: {}:{}@{}".format( user, passwd, host ) )
     except paramiko.ssh_exception.SSHException:
-        printq.put( "[!] Socket Error... skipping: {}:{}@{}".format( user, pword, host ) )
+        printq.put( "[!] Socket Error... skipping: {}:{}@{}".format( user, passwd, host ) )
     except Exception as ERROR:
-        printq.put( "[!] Error - {}... skipping: {}:{}@{}".format( ERROR, user, pword, host ) )
+        printq.put( "[!] Error - {}... skipping: {}:{}@{}".format( ERROR, user, passwd, host ) )
     ssh.close()
 
 def scanner():
@@ -46,7 +47,7 @@ def scanner():
                 for passwd in passwds:
                     user = target.group( 1 )
                     host = target.group( 2 )
-                    check_server( host, user, pword )
+                    check_server( host, user, passwd )
             else:
                 printq.put( "[!] Invalid target stub, skipping {}".format( stub ) )
             targetq.task_done()
@@ -92,7 +93,7 @@ if __name__ == "__main__":
     else:
         passwds = []
 
-    if args["userlist"]:
+    if args["users"]:
         users = [ x.rstrip( "\n" ) for x in open( args["wordlist"], "r" ).readlines() ]
     elif args["user"]:
         users = [ args["user"] ]
